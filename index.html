@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Production Cost Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <style>
+        /* Custom styles for better input appearance */
+        input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; /* Safari and Chrome */
+            margin: 0;
+        }
+        /* Ensure table layout is fixed to prevent column width jumps */
+        .table-fixed th, .table-fixed td {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            /* white-space: nowrap; */ /* Allow text wrapping */
+        }
+        /* Action Buttons Styling */
+        .action-btn {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600; /* semibold */
+            transition: background-color 0.2s;
+            margin: 0 0.25rem; /* Add horizontal spacing */
+        }
+        .download-btn {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border: 1px solid #2563eb; /* blue-600 */
+        }
+        .download-btn:hover {
+             background-color: #2563eb; /* blue-600 */
+        }
+        .share-btn {
+            background-color: #10b981; /* emerald-500 */
+            color: white;
+            border: 1px solid #059669; /* emerald-600 */
+        }
+        .share-btn:hover {
+             background-color: #059669; /* emerald-600 */
+        }
+        .import-btn {
+            background-color: #a855f7; /* purple-500 */
+            color: white;
+            border: 1px solid #9333ea; /* purple-600 */
+        }
+         .import-btn:hover {
+             background-color: #9333ea; /* purple-600 */
+        }
+        /* Remove button */
+        .remove-btn {
+            cursor: pointer;
+            color: #ef4444; /* red-500 */
+            font-weight: bold;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .remove-btn:hover {
+            background-color: #fee2e2; /* red-100 */
+        }
+        /* Add button */
+        .add-btn {
+            cursor: pointer;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.375rem; /* rounded-md */
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 500; /* medium */
+            transition: background-color 0.2s;
+            display: inline-block; /* Allow margin */
+            margin-top: 0.5rem; /* Add some space above */
+        }
+        .add-btn-internal {
+            background-color: #dbeafe; /* blue-100 */
+            color: #1e40af; /* blue-800 */
+            border: 1px solid #93c5fd; /* blue-300 */
+        }
+        .add-btn-internal:hover {
+             background-color: #bfdbfe; /* blue-200 */
+        }
+         .add-btn-external {
+            background-color: #dcfce7; /* green-100 */
+            color: #166534; /* green-800 */
+            border: 1px solid #86efac; /* green-300 */
+        }
+        .add-btn-external:hover {
+             background-color: #bbf7d0; /* green-200 */
+        }
+        /* Message Area */
+        #message-area {
+            min-height: 1.5rem; /* Ensure space is reserved */
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            text-align: center;
+            font-size: 0.875rem;
+            display: none; /* Hidden by default */
+            transition: opacity 0.5s ease-out;
+            opacity: 0; /* Start hidden for transition */
+        }
+        #message-area.show {
+            display: block;
+            opacity: 1;
+        }
+        #message-area.success {
+            background-color: #dcfce7; /* green-100 */
+            color: #166534; /* green-800 */
+            border: 1px solid #86efac; /* green-300 */
+        }
+        #message-area.error {
+            background-color: #fee2e2; /* red-100 */
+            color: #b91c1c; /* red-700 */
+            border: 1px solid #fca5a5; /* red-300 */
+        }
+        #message-area.info {
+             background-color: #e0f2fe; /* sky-100 */
+            color: #075985; /* sky-800 */
+            border: 1px solid #7dd3fc; /* sky-300 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 bg-gray-200 p-4 md:p-6">Hero Video Commercial Cost Calculator</h1>
+
+        <div class="p-4 md:p-6 overflow-x-auto">
+            <table id="cost-table" class="w-full table-fixed border-collapse border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100 text-left text-gray-600 uppercase text-sm leading-normal">
+                        <th class="py-3 px-4 border border-gray-300 w-[22%]">Item</th>
+                        <th class="py-3 px-4 border border-gray-300 w-[28%]">Description</th>
+                        <th class="py-3 px-4 border border-gray-300 w-[12%] text-center">Quantity</th>
+                        <th class="py-3 px-4 border border-gray-300 w-[15%] text-right">Unit Cost ($)</th>
+                        <th class="py-3 px-4 border border-gray-300 w-[15%] text-right">Total Cost ($)</th>
+                        <th class="py-3 px-4 border border-gray-300 w-[8%] text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="internal-costs-body" class="text-gray-700 text-sm">
+                    <tr class="bg-blue-100 font-semibold section-header">
+                        <td colspan="6" class="py-2 px-4 border border-gray-300 text-blue-800">Internal Costs</td>
+                    </tr>
+                    <tr class="cost-row" data-cost-type="internal">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Concept Development" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Initial brainstorming, script outline" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="1" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="1500.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">1500.00</td>
+                        <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                    <tr class="cost-row" data-cost-type="internal">
+                         <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Project Management" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Coordination, scheduling (days)" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="10" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="500.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">5000.00</td>
+                        <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                    <tr class="bg-blue-50 font-semibold subtotal-row">
+                        <td colspan="4" class="py-2 px-4 border border-gray-300 text-right text-blue-700">Internal Subtotal:</td>
+                        <td id="internal-subtotal" class="py-2 px-4 border border-gray-300 text-right text-blue-700">0.00</td>
+                        <td class="py-2 px-4 border border-gray-300 text-center"><button id="add-internal-row" class="add-btn add-btn-internal" title="Add Internal Cost Row">+</button></td>
+                    </tr>
+                 </tbody>
+
+                <tbody id="external-costs-body" class="text-gray-700 text-sm">
+                    <tr class="bg-green-100 font-semibold section-header">
+                        <td colspan="6" class="py-2 px-4 border border-gray-300 text-green-800">External Costs</td>
+                    </tr>
+                    <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Storyboard Artist" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Visual representation of script" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="1" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="2000.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">2000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Director" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Shoot days" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="3" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="2500.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">7500.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                         <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Camera Crew (DoP, AC, Gaffer)" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Shoot days" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="3" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="3000.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">9000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                    <tr class="cost-row" data-cost-type="external">
+                         <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Equipment Rental" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Camera, lighting, sound package (days)" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="3" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="1800.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">5400.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Actors/Talent" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Number of actors/days" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="5" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="1000.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">5000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                    <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Location Fees & Permits" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Number of locations" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="2" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="2500.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">5000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Editing & Post-Production" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Editing, color grading, sound mix" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="1" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="8000.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">8000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                         <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Music Licensing" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Stock or custom track" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="1" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="1500.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">1500.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                     <tr class="cost-row" data-cost-type="external">
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="VFX / Motion Graphics" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                        <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" value="Complexity dependent" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"></td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                            <input type="number" min="0" value="1" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                            <input type="number" min="0" step="0.01" value="3000.00" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </td>
+                        <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">3000.00</td>
+                         <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+                    </tr>
+                    <tr class="bg-green-50 font-semibold subtotal-row">
+                        <td colspan="4" class="py-2 px-4 border border-gray-300 text-right text-green-700">External Subtotal:</td>
+                        <td id="external-subtotal" class="py-2 px-4 border border-gray-300 text-right text-green-700">0.00</td>
+                        <td class="py-2 px-4 border border-gray-300 text-center"><button id="add-external-row" class="add-btn add-btn-external" title="Add External Cost Row">+</button></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="bg-gray-200 font-bold text-lg">
+                        <td colspan="4" class="py-3 px-4 border border-gray-300 text-right text-gray-800">Grand Total:</td>
+                        <td id="grand-total" class="py-3 px-4 border border-gray-300 text-right text-gray-800">0.00</td>
+                        <td class="py-3 px-4 border border-gray-300"></td> </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="p-4 md:px-6 md:pb-6 text-center">
+             <button id="share-btn" class="action-btn share-btn" title="Generate shareable link">Share</button>
+             <button id="download-csv-btn" class="action-btn download-btn" title="Download data as CSV file">Download CSV</button>
+             <label for="import-csv-input" class="action-btn import-btn" title="Import data from CSV file">
+                 Import CSV
+             </label>
+             <input type="file" id="import-csv-input" accept=".csv, text/csv" class="hidden"> <div id="message-area"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const table = document.getElementById('cost-table');
+        const internalCostsBody = document.getElementById('internal-costs-body');
+        const externalCostsBody = document.getElementById('external-costs-body');
+        const addInternalRowBtn = document.getElementById('add-internal-row');
+        const addExternalRowBtn = document.getElementById('add-external-row');
+        const downloadCsvBtn = document.getElementById('download-csv-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const importCsvInput = document.getElementById('import-csv-input');
+        const messageArea = document.getElementById('message-area');
+        let messageTimeout = null; // To manage message display timeout
+
+        // --- Helper Functions ---
+
+        /**
+         * Formats a number as a currency string (e.g., 1234.5 -> 1,234.50).
+         * @param {number|string} value The number to format.
+         * @returns {string} The formatted currency string.
+         */
+        function formatCurrency(value) {
+            const numberValue = Number(value) || 0;
+            return numberValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        /**
+         * Parses a currency string back into a number (e.g., "1,234.50" -> 1234.5).
+         * @param {string|number} value The currency string or number.
+         * @returns {number} The parsed number.
+         */
+        function parseCurrency(value) {
+            if (typeof value !== 'string') return Number(value) || 0;
+            // Remove currency symbols, commas, and handle potential errors
+            return Number(value.replace(/[^0-9.-]+/g,"")) || 0;
+        }
+
+        /**
+         * Displays a message to the user in the message area.
+         * @param {string} message The message text.
+         * @param {'info'|'success'|'error'} type The type of message (determines styling).
+         * @param {number} duration How long the message should be visible in milliseconds.
+         */
+        function displayMessage(message, type = 'info', duration = 3000) {
+            messageArea.textContent = message;
+            messageArea.className = `show ${type}`; // Add type class and 'show' class
+
+            // Clear any existing timeout
+            if (messageTimeout) clearTimeout(messageTimeout);
+
+            // Automatically hide after duration
+            messageTimeout = setTimeout(() => {
+                messageArea.classList.remove('show');
+                // Optional: Reset classes completely after transition ends
+                // messageArea.addEventListener('transitionend', () => {
+                //     messageArea.className = '';
+                // }, { once: true });
+            }, duration);
+        }
+
+        // --- Core Calculation Logic ---
+
+        /**
+         * Calculates the total cost for a single table row based on its quantity and unit cost inputs.
+         * Updates the row's total cell display.
+         * @param {HTMLTableRowElement} row The table row element.
+         * @returns {number} The calculated total for the row.
+         */
+        function calculateRowTotal(row) {
+            const quantityInput = row.querySelector('.quantity');
+            const unitCostInput = row.querySelector('.unit-cost');
+            const rowTotalCell = row.querySelector('.row-total');
+
+            // Get values, default to 0 if empty or invalid
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const unitCost = parseFloat(unitCostInput.value) || 0;
+            const total = quantity * unitCost;
+
+            // Update the row total cell display, formatted as currency
+            rowTotalCell.textContent = formatCurrency(total);
+            return total;
+        }
+
+        /**
+         * Calculates and updates the internal/external subtotals and the grand total.
+         */
+        function calculateTotals() {
+            const rows = table.querySelectorAll('.cost-row'); // Get all cost rows
+            let internalSubtotal = 0;
+            let externalSubtotal = 0;
+
+            rows.forEach(row => {
+                // Check if the row is actually visible/part of the DOM before calculating
+                if (row.offsetParent !== null) {
+                    const rowTotal = calculateRowTotal(row); // Calculate row total first
+                    const costType = row.dataset.costType;
+
+                    if (costType === 'internal') {
+                        internalSubtotal += rowTotal;
+                    } else if (costType === 'external') {
+                        externalSubtotal += rowTotal;
+                    }
+                }
+            });
+
+            const grandTotal = internalSubtotal + externalSubtotal;
+
+            // Update the subtotal and grand total display elements
+            document.getElementById('internal-subtotal').textContent = formatCurrency(internalSubtotal);
+            document.getElementById('external-subtotal').textContent = formatCurrency(externalSubtotal);
+            document.getElementById('grand-total').textContent = formatCurrency(grandTotal);
+        }
+
+        // --- Row Manipulation ---
+
+        /**
+         * Adds a new cost row to the table.
+         * @param {'internal'|'external'} costType The type of cost (determines section and styling).
+         * @param {object} [rowData={}] Optional data to pre-fill the row's input fields.
+         * @param {string} [rowData.item] Item name.
+         * @param {string} [rowData.desc] Item description.
+         * @param {number|string} [rowData.qty=1] Quantity.
+         * @param {number|string} [rowData.cost='0.00'] Unit cost.
+         */
+        function addRow(costType, rowData = {}) {
+            const newRow = document.createElement('tr');
+            newRow.classList.add('cost-row');
+            newRow.dataset.costType = costType; // Set the cost type
+
+            // Determine focus ring color based on cost type
+            const focusRingColor = costType === 'internal' ? 'focus:ring-blue-500' : 'focus:ring-green-500';
+
+            // Populate the inner HTML of the new row
+            newRow.innerHTML = `
+                <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" placeholder="Item Name" class="item-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none ${focusRingColor}" value="${rowData.item || ''}"></td>
+                <td class="py-3 px-4 border border-gray-300 align-top"><input type="text" placeholder="Description" class="item-desc w-full border border-gray-300 rounded px-2 py-1 focus:outline-none ${focusRingColor}" value="${rowData.desc || ''}"></td>
+                <td class="py-3 px-4 border border-gray-300 text-center align-top">
+                    <input type="number" min="0" value="${rowData.qty === undefined ? 1 : rowData.qty}" class="quantity w-full text-center border border-gray-300 rounded px-2 py-1 focus:outline-none ${focusRingColor}">
+                </td>
+                <td class="py-3 px-4 border border-gray-300 text-right align-top">
+                    <input type="number" min="0" step="0.01" value="${rowData.cost === undefined ? '0.00' : rowData.cost}" class="unit-cost w-full text-right border border-gray-300 rounded px-2 py-1 focus:outline-none ${focusRingColor}">
+                </td>
+                <td class="py-3 px-4 border border-gray-300 text-right align-top row-total">0.00</td>
+                <td class="py-3 px-4 border border-gray-300 text-center align-top"><button class="remove-btn" title="Remove Row">X</button></td>
+            `;
+
+            // Determine the correct table body and subtotal row for insertion
+            const targetBody = costType === 'internal' ? internalCostsBody : externalCostsBody;
+            const subtotalRow = targetBody.querySelector('.subtotal-row');
+
+            // Insert the new row before the subtotal row
+            targetBody.insertBefore(newRow, subtotalRow);
+
+            // Note: calculateTotals() will be called by the initiating function (e.g., button click, import)
+        }
+
+        /**
+         * Removes all dynamic cost rows (rows with class 'cost-row') from the table.
+         */
+        function clearTableRows() {
+             internalCostsBody.querySelectorAll('.cost-row').forEach(row => row.remove());
+             externalCostsBody.querySelectorAll('.cost-row').forEach(row => row.remove());
+        }
+
+        /**
+         * Populates the table with data from an array of row objects.
+         * @param {Array<object>} data Array of row data objects. Each object should have 'type', 'item', 'desc', 'qty', 'cost'.
+         */
+        function populateTableFromData(data) {
+             clearTableRows(); // Clear existing dynamic rows first
+             if (!Array.isArray(data)) {
+                 console.error("Invalid data format for populating table.");
+                 displayMessage("Failed to load data: Invalid format.", "error");
+                 return;
+             }
+             data.forEach(rowData => {
+                 // Basic validation for row type
+                 if (rowData && rowData.type && (rowData.type === 'internal' || rowData.type === 'external')) {
+                     addRow(rowData.type, rowData);
+                 } else {
+                     console.warn("Skipping invalid row data during population:", rowData);
+                 }
+             });
+             calculateTotals(); // Recalculate totals after populating all rows
+        }
+
+
+        // --- Sharing Functionality (URL Hash) ---
+
+        /**
+         * Extracts the current data from all cost rows in the table.
+         * @returns {Array<object>} An array of objects, each representing a row.
+         */
+        function getTableData() {
+            const data = [];
+            table.querySelectorAll('.cost-row').forEach(row => {
+                // Ensure the row is actually part of the table structure
+                if (row.offsetParent !== null) {
+                    data.push({
+                        type: row.dataset.costType,
+                        item: row.querySelector('.item-name').value,
+                        desc: row.querySelector('.item-desc').value,
+                        qty: row.querySelector('.quantity').value,
+                        cost: row.querySelector('.unit-cost').value
+                    });
+                }
+            });
+            return data;
+        }
+
+        /**
+         * Encodes table data into a URL-safe string using JSON, pako compression, and Base64.
+         * @param {Array<object>} data The table data array from getTableData().
+         * @returns {string|null} The encoded string or null on error.
+         */
+        function encodeDataForUrl(data) {
+            try {
+                const jsonString = JSON.stringify(data);
+                // Check if pako is loaded
+                if (typeof pako === 'undefined') {
+                    console.warn("pako library not loaded. Skipping compression.");
+                    // Fallback: Encode JSON directly (will result in longer URLs)
+                    const base64 = btoa(jsonString);
+                    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                }
+                // Compress using pako
+                const compressed = pako.deflate(jsonString, { to: 'string' });
+                // Encode compressed data to Base64
+                const base64 = btoa(compressed);
+                // Make it URL-safe (replace '+' with '-', '/' with '_', remove padding '=')
+                return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            } catch (e) {
+                console.error("Error encoding data:", e);
+                displayMessage("Error preparing data for sharing.", "error");
+                return null;
+            }
+        }
+
+        /**
+         * Decodes URL-safe string back into table data array.
+         * @param {string} encodedString The URL-safe encoded string.
+         * @returns {Array<object>|null} The decoded data array or null on error.
+         */
+        function decodeDataFromUrl(encodedString) {
+            try {
+                 // Make it Base64-safe again (add back replacements and padding)
+                let base64 = encodedString.replace(/-/g, '+').replace(/_/g, '/');
+                while (base64.length % 4) {
+                    base64 += '=';
+                }
+                // Decode Base64
+                const compressed = atob(base64);
+
+                 // Check if pako is loaded
+                if (typeof pako === 'undefined') {
+                     console.warn("pako library not loaded. Assuming data is not compressed.");
+                     // Fallback: Assume it's just Base64 encoded JSON
+                     return JSON.parse(compressed); // 'compressed' is actually the JSON string here
+                }
+
+                 // Decompress using pako
+                const jsonString = pako.inflate(compressed, { to: 'string' });
+                return JSON.parse(jsonString);
+            } catch (e) {
+                console.error("Error decoding data:", e);
+                return null; // Return null indicates decoding failure
+            }
+        }
+
+        /**
+         * Generates a shareable link containing the current table data and copies it to the clipboard.
+         */
+        function generateShareLink() {
+            const data = getTableData();
+            if (data.length === 0) {
+                displayMessage("Table is empty, nothing to share.", "info");
+                return;
+            }
+            const encodedData = encodeDataForUrl(data);
+            if (!encodedData) {
+                // Error message already shown by encodeDataForUrl
+                return;
+            }
+
+            const currentUrl = window.location.href.split('#')[0]; // Get URL without existing hash
+            const shareUrl = `${currentUrl}#data=${encodedData}`;
+
+            // Attempt to copy to clipboard
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                displayMessage("Share link copied to clipboard!", "success");
+            }).catch(err => {
+                console.error('Failed to copy link automatically: ', err);
+                 displayMessage("Could not auto-copy link. Please copy it manually.", "error", 5000);
+                 // Provide the link in the message area for manual copying
+                 messageArea.innerHTML += `<br><input type='text' value='${shareUrl}' readonly class='w-full mt-2 p-1 border rounded bg-gray-100 text-xs'>`;
+            });
+        }
+
+        /**
+         * Checks the URL hash on page load and populates the table if valid data is found.
+         */
+        function loadDataFromUrlHash() {
+            // Check if hash exists and starts with #data=
+            if (window.location.hash && window.location.hash.startsWith('#data=')) {
+                const encodedData = window.location.hash.substring(6); // Get data part
+                try {
+                    const decodedData = decodeDataFromUrl(encodedData);
+                    if (decodedData) {
+                        populateTableFromData(decodedData);
+                        displayMessage("Data loaded from shared link.", "info", 4000);
+                        // Optionally clear the hash after loading to prevent re-loading on refresh
+                        // history.replaceState(null, null, ' ');
+                    } else {
+                        // Decoding failed
+                        displayMessage("Could not load data from the link (invalid format).", "error", 5000);
+                        history.replaceState(null, null, ' '); // Clear invalid hash
+                        calculateTotals(); // Calculate totals for default rows
+                    }
+                } catch (error) {
+                     console.error("Error processing URL hash data:", error);
+                     displayMessage("Error loading data from link.", "error", 5000);
+                     history.replaceState(null, null, ' '); // Clear invalid hash
+                     calculateTotals(); // Calculate totals for default rows
+                }
+            } else {
+                // No hash data, just calculate totals for any default rows present
+                 calculateTotals();
+            }
+        }
+
+
+        // --- CSV Import/Export ---
+
+        /**
+         * Escapes special characters in a value for CSV compatibility.
+         * @param {*} value The value to escape.
+         * @returns {string} The CSV-safe string.
+         */
+        function escapeCsvValue(value) {
+             if (value === null || value === undefined) return '';
+            let stringValue = String(value);
+            // If the value contains a comma, newline, or double quote, enclose it in double quotes
+            if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+                // Escape existing double quotes by doubling them
+                stringValue = stringValue.replace(/"/g, '""');
+                // Enclose the entire string in double quotes
+                stringValue = `"${stringValue}"`;
+            }
+            return stringValue;
+        }
+
+        /**
+         * Generates CSV content string from the current table data.
+         * @returns {string} The generated CSV content.
+         */
+        function generateCSV() {
+            let csvRows = [];
+            // Define CSV Headers
+            const headers = ["Type", "Item", "Description", "Quantity", "Unit Cost ($)", "Total Cost ($)"];
+            csvRows.push(headers.join(',')); // Add header row
+
+            const tableData = getTableData(); // Get current data
+            let currentType = null;
+            let internalSubtotal = 0;
+            let externalSubtotal = 0;
+
+            tableData.forEach(row => {
+                // Add section header row if the type changes
+                if (row.type !== currentType) {
+                    // Add blank separator row if not the first section
+                    if (currentType !== null) csvRows.push('');
+                    currentType = row.type;
+                    // Add the section title row (spanning visually in spreadsheet)
+                    csvRows.push(escapeCsvValue(currentType === 'internal' ? 'Internal Costs' : 'External Costs') + ',,,,,');
+                }
+
+                // Calculate row total specifically for CSV export
+                const quantity = parseFloat(row.qty) || 0;
+                const unitCost = parseFloat(row.cost) || 0;
+                const totalCost = quantity * unitCost;
+
+                 // Accumulate subtotals based on the row type
+                if (currentType === 'internal') internalSubtotal += totalCost;
+                else if (currentType === 'external') externalSubtotal += totalCost;
+
+                // Create the data row array
+                const rowData = [
+                    escapeCsvValue(row.type),
+                    escapeCsvValue(row.item),
+                    escapeCsvValue(row.desc),
+                    escapeCsvValue(row.qty),
+                    escapeCsvValue(row.cost), // Use the raw unit cost value
+                    escapeCsvValue(totalCost.toFixed(2)) // Use the calculated total, formatted
+                ];
+                csvRows.push(rowData.join(',')); // Join values with commas
+            });
+
+             // Add subtotals and grand total rows if there was data
+            if (tableData.length > 0) {
+                 // Add internal subtotal if applicable
+                 if (internalSubtotal > 0 || tableData.some(r => r.type === 'internal')) {
+                     csvRows.push(''); // Blank separator
+                     csvRows.push(',,,,Internal Subtotal:,' + escapeCsvValue(internalSubtotal.toFixed(2)));
+                 }
+                 // Add external subtotal if applicable
+                 if (externalSubtotal > 0 || tableData.some(r => r.type === 'external')) {
+                      csvRows.push(''); // Blank separator
+                     csvRows.push(',,,,External Subtotal:,' + escapeCsvValue(externalSubtotal.toFixed(2)));
+                 }
+                 // Add grand total
+                 const grandTotal = internalSubtotal + externalSubtotal;
+                 csvRows.push(''); // Blank separator
+                 csvRows.push(',,,,Grand Total:,' + escapeCsvValue(grandTotal.toFixed(2)));
+            }
+
+            // Join all rows with newline characters
+            return csvRows.join('\n');
+        }
+
+        /**
+         * Triggers the download of the generated CSV data.
+         */
+        function downloadCSV() {
+             const csvData = generateCSV();
+             // Check if CSV has more than just the header row
+             if (!csvData || csvData.split('\n').length <= 1) {
+                 displayMessage("Table is empty, nothing to download.", "info");
+                 return;
+             }
+
+            // Create a Blob (binary large object) for the CSV data
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+
+            // Create a temporary link element to trigger the download
+            const link = document.createElement("a");
+            // Check if browser supports the download attribute
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob); // Create a URL for the blob
+                link.setAttribute("href", url);
+                link.setAttribute("download", "video_production_costs.csv"); // Set filename
+                link.style.visibility = 'hidden'; // Hide the link
+                document.body.appendChild(link); // Add link to the DOM
+                link.click(); // Simulate click to trigger download
+                document.body.removeChild(link); // Clean up by removing the link
+                URL.revokeObjectURL(url); // Release the object URL
+            } else {
+                 // Fallback for older browsers (might open in new tab instead of downloading)
+                 alert("CSV download is not fully supported in this browser. The data might open in a new tab.");
+                 // Consider providing the data in a textarea as another fallback
+            }
+        }
+
+        /**
+         * Parses a CSV string into an array of row data objects.
+         * This is a simplified parser and might need improvement for complex CSVs.
+         * @param {string} csvString The raw CSV text content.
+         * @returns {Array<object>} Array of parsed row data objects.
+         */
+        function parseCSV(csvString) {
+            const data = [];
+            // Split lines, handling both \n and \r\n line endings
+            const lines = csvString.split(/\r?\n/);
+            let currentType = null; // Track the current section type
+
+            // Start from line 1 to skip the expected header row
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue; // Skip empty lines
+
+                // --- Attempt to identify and skip non-data rows ---
+                // Check for section headers (simple check, assumes they don't contain commas)
+                const lowerLine = line.toLowerCase();
+                if (lowerLine.includes('internal costs') && !line.includes(',')) {
+                    currentType = 'internal';
+                    continue; // Skip this line
+                }
+                if (lowerLine.includes('external costs') && !line.includes(',')) {
+                    currentType = 'external';
+                    continue; // Skip this line
+                }
+                // Skip subtotal/grand total lines (check for common patterns)
+                if (lowerLine.includes('subtotal:') || lowerLine.includes('grand total:')) {
+                    continue; // Skip this line
+                }
+
+                // --- Process potential data rows ---
+                // Basic CSV parsing: Split by comma. Limitations: Doesn't handle commas within quoted fields well.
+                const values = line.split(',');
+
+                // Check if the first column looks like a valid type ('internal' or 'external')
+                // and if we have roughly the expected number of columns (at least 5: Type, Item, Desc, Qty, Cost)
+                if (values.length >= 5 && values[0] && (values[0].toLowerCase().trim() === 'internal' || values[0].toLowerCase().trim() === 'external')) {
+                     const rowType = values[0].toLowerCase().trim();
+
+                    // Helper to clean potential quotes and trim whitespace
+                    const cleanValue = (val, defaultValue = '') => {
+                        if (val === undefined || val === null) return defaultValue;
+                        return String(val).trim().replace(/^"|"$/g, '').replace(/""/g, '"');
+                    };
+
+                    data.push({
+                        type: rowType,
+                        item: cleanValue(values[1]),
+                        desc: cleanValue(values[2]),
+                        qty: cleanValue(values[3], '1'), // Default quantity to 1 if missing/invalid
+                        cost: cleanValue(values[4], '0.00') // Default cost to 0.00 if missing/invalid
+                    });
+                } else {
+                    console.warn("Skipping unrecognized CSV line during import:", line);
+                }
+            }
+            return data;
+        }
+
+
+        /**
+         * Handles the file selection event for CSV import.
+         * Reads the file content and triggers parsing and table population.
+         * @param {Event} event The file input change event.
+         */
+        function handleCsvImport(event) {
+            const file = event.target.files[0];
+            if (!file) return; // No file selected
+
+            // Basic MIME type check
+            if (file.type && !file.type.match('text/csv') && file.type !== 'application/vnd.ms-excel') {
+                 displayMessage(`Invalid file type: ${file.type}. Please select a CSV file.`, "error", 5000);
+                 event.target.value = null; // Reset file input
+                 return;
+            }
+
+            const reader = new FileReader();
+
+            // Define what happens when the file is successfully read
+            reader.onload = (e) => {
+                try {
+                    const csvContent = e.target.result;
+                    const parsedData = parseCSV(csvContent);
+
+                    if (parsedData && parsedData.length > 0) {
+                        populateTableFromData(parsedData);
+                        displayMessage(`Successfully imported ${parsedData.length} items from CSV.`, "success");
+                        // Clear the URL hash if we just imported data, to avoid confusion
+                        history.replaceState(null, null, ' ');
+                    } else {
+                         displayMessage("Could not parse CSV or the file appears empty/invalid.", "error", 5000);
+                    }
+                } catch (error) {
+                    console.error("Error processing CSV:", error);
+                    displayMessage("An error occurred while importing the CSV file.", "error", 5000);
+                } finally {
+                     // Clear the file input value regardless of success/failure
+                     // Allows selecting the same file again if needed after an error
+                     event.target.value = null;
+                }
+            };
+
+            // Define what happens on file reading error
+            reader.onerror = () => {
+                 displayMessage("Error reading the selected file.", "error", 5000);
+                 event.target.value = null; // Reset file input
+            };
+
+            // Start reading the file as text
+            reader.readAsText(file);
+        }
+
+
+        // --- Event Handling Setup ---
+
+        /**
+         * Handles input events within the table (delegated).
+         * Recalculates totals if quantity or unit cost changes.
+         * @param {Event} event The input event.
+         */
+        function handleTableInput(event) {
+             // Check if the event target is a quantity or unit cost input within a cost row
+            if ((event.target.classList.contains('quantity') || event.target.classList.contains('unit-cost')) && event.target.closest('.cost-row')) {
+                 calculateTotals(); // Recalculate all totals
+            }
+        }
+
+        /**
+         * Handles click events within the table (delegated).
+         * Removes a row if the remove button is clicked.
+         * @param {Event} event The click event.
+         */
+        function handleTableClick(event) {
+            // Check if the clicked element is a remove button
+            if (event.target.classList.contains('remove-btn')) {
+                const row = event.target.closest('tr.cost-row'); // Find the closest cost-row ancestor
+                if (row) {
+                    row.remove(); // Remove the row from the DOM
+                    calculateTotals(); // Recalculate totals after removal
+                }
+            }
+        }
+
+        // --- Initialization ---
+
+        // Attach event listeners using delegation for dynamic rows
+        table.addEventListener('input', handleTableInput); // For quantity/cost changes
+        table.addEventListener('click', handleTableClick); // For remove button clicks
+
+        // Attach event listeners for the 'Add Row' buttons
+        addInternalRowBtn.addEventListener('click', () => {
+            addRow('internal'); // Add a blank internal row
+            calculateTotals(); // Recalculate totals
+        });
+        addExternalRowBtn.addEventListener('click', () => {
+             addRow('external'); // Add a blank external row
+             calculateTotals(); // Recalculate totals
+        });
+
+        // Attach event listener for the 'Download CSV' button
+        downloadCsvBtn.addEventListener('click', downloadCSV);
+
+        // Attach event listener for the 'Share' button
+        shareBtn.addEventListener('click', generateShareLink);
+
+        // Attach event listener for the 'Import CSV' file input
+        importCsvInput.addEventListener('change', handleCsvImport);
+
+        // Initial load sequence:
+        // 1. Wait for the DOM to be fully loaded.
+        // 2. Check the URL hash for shared data and load it if valid.
+        // 3. If no valid hash data, calculate totals for any default rows present.
+        document.addEventListener('DOMContentLoaded', loadDataFromUrlHash);
+
+    </script>
+
+</body>
+</html>
